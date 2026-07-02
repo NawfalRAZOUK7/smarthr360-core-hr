@@ -156,8 +156,9 @@ class SurveySubmitView(ApiResponseMixin, APIView):
         answers = serializer.validated_data["answers"]
 
         department = None
-        if hasattr(request.user, "employee_profile"):
-            department = request.get_own_profile(user).department
+        own_profile = get_own_profile(request.user)
+        if own_profile is not None:
+            department = own_profile.department
 
         response = SurveyResponse.objects.create(
             survey=survey,
