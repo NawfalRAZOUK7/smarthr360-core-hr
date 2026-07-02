@@ -1,0 +1,2 @@
+# Legacy monolith tests kept for reference during migration.
+# They assume a local accounts app and are NOT collected (renamed dir).
