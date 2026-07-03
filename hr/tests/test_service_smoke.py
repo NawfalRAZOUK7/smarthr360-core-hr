@@ -161,3 +161,42 @@ class ServiceSmokeTests(TestCase):
             "/api/hr/departments/", HTTP_AUTHORIZATION="Bearer not-a-token"
         )
         self.assertEqual(resp.status_code, 401)
+
+    # ------------------------------------------------- wellbeing anonymity
+
+    def test_wellbeing_stats_suppressed_below_threshold(self):
+        # create survey with one question and a single response
+        survey = self.client.post(
+            "/api/wellbeing/surveys/", {"title": "Tiny sample"},
+            content_type="application/json", **auth_header(3, "HR"),
+        ).json()["data"]
+        q = self.client.post(
+            f"/api/wellbeing/surveys/{survey['id']}/questions/",
+            {"text": "Stress?", "type": "SCALE_1_5", "order": 1},
+            content_type="application/json", **auth_header(3, "HR"),
+        ).json()["data"]
+        self.client.post(
+            f"/api/wellbeing/surveys/{survey['id']}/submit/",
+            {"answers": {str(q["id"]): "4"}},
+            content_type="application/json", **auth_header(90, "EMPLOYEE"),
+        )
+
+        stats = self.client.get(
+            f"/api/wellbeing/surveys/{survey['id']}/stats/",
+            **auth_header(3, "HR"),
+        ).json()["data"]
+        self.assertTrue(stats["suppressed"])
+        self.assertEqual(stats["responses_count"], 1)
+
+        # 4 more submissions cross the threshold -> real stats
+        for uid in range(91, 95):
+            self.client.post(
+                f"/api/wellbeing/surveys/{survey['id']}/submit/",
+                {"answers": {str(q["id"]): "3"}},
+                content_type="application/json", **auth_header(uid, "EMPLOYEE"),
+            )
+        stats = self.client.get(
+            f"/api/wellbeing/surveys/{survey['id']}/stats/",
+            **auth_header(3, "HR"),
+        ).json()["data"]
+        self.assertNotIn("suppressed", stats)

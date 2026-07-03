@@ -1,6 +1,7 @@
 import json
 
 # wellbeing/views.py (UPDATED WITH ENVELOPE)
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import PermissionDenied
@@ -185,6 +186,27 @@ class SurveyStatsView(ApiResponseMixin, APIView):
 
         survey = get_object_or_404(WellbeingSurvey, pk=survey_id)
         responses = SurveyResponse.objects.filter(survey=survey)
+
+        # Anonymity threshold (GDPR / spec "Auditabilité + anonymisation"):
+        # aggregates over tiny samples can de-anonymize respondents, so
+        # stats are suppressed until enough responses exist.
+        min_responses = getattr(settings, "WELLBEING_MIN_RESPONSES", 5)
+        if responses.count() < min_responses:
+            return self.success_response(
+                {
+                    "survey_id": survey.id,
+                    "title": survey.title,
+                    "suppressed": True,
+                    "detail": (
+                        f"Statistics are hidden until at least "
+                        f"{min_responses} responses are collected "
+                        f"(currently {responses.count()}) to protect "
+                        f"respondent anonymity."
+                    ),
+                    "responses_count": responses.count(),
+                    "min_responses": min_responses,
+                }
+            )
 
         questions_data = []
         for q in survey.questions.all():
