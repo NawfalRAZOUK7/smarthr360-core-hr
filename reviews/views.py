@@ -124,11 +124,24 @@ class PerformanceReviewListCreateView(ApiResponseMixin, generics.ListCreateAPIVi
             else:
                 manager = employee.manager
 
+        # Optional: pre-create unrated items from a review template
+        template = None
+        template_id = self.request.data.get("template_id")
+        if template_id:
+            from .feedback_api import apply_template
+            from .models import ReviewTemplate
+
+            template = get_object_or_404(
+                ReviewTemplate, pk=template_id, is_active=True
+            )
+
         review = serializer.save(
             employee=employee,
             manager=manager,
             cycle=cycle,
         )
+        if template is not None:
+            apply_template(review, template)
         # overall_score will be computed later when items are added
         return review
 

@@ -84,12 +84,14 @@ class PerformanceReview(models.Model):
         """
         Recompute overall_score as the average of all ReviewItem scores.
         """
-        items = self.items.all()
-        if not items.exists():
+        rated = [i for i in self.items.all() if i.score is not None]
+        if not rated:
             self.overall_score = None
         else:
-            total = sum(i.score for i in items)
-            self.overall_score = total / items.count()
+            total_weight = sum(i.weight for i in rated) or 1
+            self.overall_score = (
+                sum(i.score * i.weight for i in rated) / total_weight
+            )
         self.save(update_fields=["overall_score"])
 
 class ReviewItem(models.Model):
@@ -103,8 +105,11 @@ class ReviewItem(models.Model):
         related_name="items",
     )
     criteria = models.CharField(max_length=255)
-    # 1–5 scale
-    score = models.PositiveSmallIntegerField()
+    # 1–5 scale; null = created from a template, not yet rated
+    score = models.PositiveSmallIntegerField(null=True, blank=True)
+    weight = models.PositiveSmallIntegerField(
+        default=1, help_text="Relative weight in the overall score."
+    )
     comment = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -162,3 +167,53 @@ class Goal(models.Model):
 
     def __str__(self):
         return f"Goal for {self.employee}: {self.title}"
+
+
+class ReviewTemplate(models.Model):
+    """Reusable set of review criteria (e.g. 'Engineering IC template').
+
+    `items` is a list of {"criteria": str, "weight": int} dicts; applying
+    a template at review creation pre-creates unrated ReviewItems.
+    """
+
+    name = models.CharField(max_length=150, unique=True)
+    description = models.TextField(blank=True)
+    items = models.JSONField(default=list)
+    is_active = models.BooleanField(default=True)
+    created_by_user_id = models.PositiveBigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class PeerFeedback(models.Model):
+    """360° feedback: colleagues rate a review subject.
+
+    The reviewee sees aggregates and anonymized comments; only HR sees
+    who said what (anonymity encourages honesty, auditability is kept).
+    """
+
+    class Relationship(models.TextChoices):
+        PEER = "PEER", "Peer"
+        REPORT = "REPORT", "Direct report"
+        OTHER = "OTHER", "Other"
+
+    review = models.ForeignKey(
+        PerformanceReview, on_delete=models.CASCADE, related_name="peer_feedback"
+    )
+    reviewer_user_id = models.PositiveBigIntegerField()
+    relationship = models.CharField(
+        max_length=20, choices=Relationship.choices, default=Relationship.PEER
+    )
+    rating = models.PositiveSmallIntegerField(help_text="1-5")
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("review", "reviewer_user_id")
+        ordering = ["-created_at"]

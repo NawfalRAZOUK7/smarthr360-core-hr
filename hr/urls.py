@@ -1,5 +1,6 @@
 from django.urls import path
 
+from .org_api import EmployeeExportView, OrgChartView, SkillMatrixView
 from .views import (
     DepartmentDetailView,
     DepartmentListCreateView,
@@ -16,6 +17,11 @@ from .views import (
 )
 
 urlpatterns = [
+    # Organization insights
+    path("org-chart/", OrgChartView.as_view(), name="hr-org-chart"),
+    path("skill-matrix/", SkillMatrixView.as_view(), name="hr-skill-matrix"),
+    path("employees/export/", EmployeeExportView.as_view(), name="hr-employee-export"),
+
     # Departments
     path("departments/", DepartmentListCreateView.as_view(), name="hr-department-list"),
     path("departments/<int:pk>/", DepartmentDetailView.as_view(), name="hr-department-detail"),

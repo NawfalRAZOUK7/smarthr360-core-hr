@@ -1,6 +1,11 @@
 # reviews/urls.py
 from django.urls import path
 
+from .feedback_api import (
+    PeerFeedbackView,
+    ReviewTemplateDetailView,
+    ReviewTemplateListCreateView,
+)
 from .views import (
     GoalDetailView,
     GoalListCreateView,
@@ -15,6 +20,11 @@ from .views import (
 )
 
 urlpatterns = [
+    # review templates + 360 feedback
+    path("templates/", ReviewTemplateListCreateView.as_view(), name="review-template-list"),
+    path("templates/<int:pk>/", ReviewTemplateDetailView.as_view(), name="review-template-detail"),
+    path("<int:review_id>/feedback/", PeerFeedbackView.as_view(), name="review-feedback"),
+
     # cycles
     path("cycles/", ReviewCycleListCreateView.as_view(), name="review-cycle-list"),
     path("cycles/<int:pk>/", ReviewCycleDetailView.as_view(), name="review-cycle-detail"),
