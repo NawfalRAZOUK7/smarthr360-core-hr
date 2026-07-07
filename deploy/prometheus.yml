@@ -1,0 +1,23 @@
+# Prometheus scrape config for the isolated core-hr composition (Étape 5).
+# Inside the compose network the service is reachable as core-hr:8000 and
+# exposes Django + custom metrics at /metrics via django-prometheus.
+#
+# Custom metrics exported by this service:
+#   smarthr360_erp_sync_runs_total{source_system,status}
+#   smarthr360_erp_sync_records_total{source_system,outcome}
+#   smarthr360_erp_sync_last_success_timestamp_seconds{source_system}
+#   smarthr360_skill_gap_forecasts{department,severity}
+#   smarthr360_skill_gap_high_count{department}
+#   smarthr360_skill_gap_last_run_timestamp_seconds
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: smarthr360-core-hr
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["core-hr:8000"]
+        labels:
+          service: core-hr

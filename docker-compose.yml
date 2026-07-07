@@ -1,0 +1,55 @@
+# Isolated deployment of smarthr360-core-hr with its own PostgreSQL and a
+# local Prometheus scraping the service's /metrics endpoint (Étape 5).
+#
+#   docker compose up --build
+#     core-hr    -> http://localhost:8001         (API, /metrics, /healthz)
+#     prometheus -> http://localhost:9090         (targets: core-hr:8000)
+#
+# This composition is self-contained and independent from the umbrella
+# smarthr360-platform compose, so the satellite can be run/tested on its own.
+
+name: smarthr360-core-hr
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: smarthr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smarthr}
+      POSTGRES_DB: smarthr_core_hr
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smarthr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  core-hr:
+    build: .
+    environment:
+      # Plain HTTP locally: base settings keep SSL-redirect off.
+      DJANGO_SETTINGS_MODULE: config.settings.base
+      SECRET_KEY: ${CORE_HR_SECRET_KEY:-dev-insecure-secret-key}
+      DEBUG: "False"
+      ALLOWED_HOSTS: "core-hr,localhost,127.0.0.1"
+      DATABASE_URL: postgres://smarthr:${POSTGRES_PASSWORD:-smarthr}@postgres:5432/smarthr_core_hr
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    depends_on:
+      - core-hr
+    ports:
+      - "9090:9090"
+
+volumes:
+  pgdata:
