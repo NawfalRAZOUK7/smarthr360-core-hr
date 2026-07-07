@@ -12,6 +12,7 @@ class Department(models.Model):
     Basic department / team inside SmartHR360.
     Example: 'IT', 'HR', 'Finance', 'Marketing'...
     """
+
     name = models.CharField(max_length=100, unique=True)
     code = models.CharField(max_length=20, unique=True)
     description = models.TextField(blank=True)
@@ -41,8 +42,31 @@ class EmployeeProfile(models.Model):
         HR = "HR", "HR"
         ADMIN = "ADMIN", "Admin"
 
-    # Identity (auth service user), by value
-    user_id = models.PositiveBigIntegerField(unique=True, db_index=True)
+    # Identity (auth service user), by value.
+    # Nullable: employees ingested from an ERP (EAI layer) may exist before an
+    # auth account is provisioned. NULLs are allowed multiple times in Postgres,
+    # the unique constraint still forbids duplicate non-null ids.
+    user_id = models.PositiveBigIntegerField(
+        unique=True, db_index=True, null=True, blank=True
+    )
+
+    # --- MDM / EAI federation keys (ADR: ERP integration layer) -------------
+    # Stable identifier of this employee in the *source* system (SAP PERNR,
+    # Odoo hr.employee id, matricule...). Combined with `source_system` it is
+    # the natural key used for idempotent upserts from the ERP connector.
+    external_employee_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="Employee id/matricule in the source ERP (SAP PERNR, Odoo id...).",
+    )
+    source_system = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Origin system of the record, e.g. 'ODOO', 'SAP', 'MANUAL'.",
+    )
+
     email = models.EmailField(blank=True)
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
@@ -80,11 +104,31 @@ class EmployeeProfile(models.Model):
     phone_number = models.CharField(max_length=30, blank=True)
     is_active = models.BooleanField(default=True)
 
+    # Monthly gross salary. Tracked historically (SCD Type 2) via
+    # EmployeeProfileHistory. Nullable: not every source provides it.
+    salary = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Current monthly gross salary. Changes are historized (SCD2).",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["id"]
+        constraints = [
+            # Natural key for ERP upserts: an external id is unique *within* a
+            # given source system. Empty external ids (manual entries) are
+            # exempted via the condition so they don't collide with each other.
+            models.UniqueConstraint(
+                fields=["source_system", "external_employee_id"],
+                name="uniq_employee_source_external_id",
+                condition=~models.Q(external_employee_id=""),
+            ),
+        ]
 
     def __str__(self):
         return f"{self.email or self.user_id} - {self.job_title or 'Employee'}"
@@ -206,3 +250,162 @@ class FutureCompetency(models.Model):
     def __str__(self):
         dept = self.department.name if self.department else "Global"
         return f"{self.skill.name} ({dept}, {self.timeframe})"
+
+
+class EmployeeProfileHistory(models.Model):
+    """Slowly Changing Dimension (Type 2) history of an employee's HR facts.
+
+    Every time a *tracked* attribute of an ``EmployeeProfile`` changes (job
+    title, department, manager, employment type, role or salary), the currently
+    open row is closed (``date_fin`` set, ``is_current=False``) and a new row is
+    opened. This preserves the full timeline — required for BI / decision support
+    and for the future-skills predictions (Étape 4).
+
+    Invariants:
+    * At most one *open* row per employee (``date_fin IS NULL``,
+      ``is_current=True``) — enforced by a partial unique constraint.
+    * Rows never overlap: ``date_debut`` of version N+1 == ``date_fin`` of N.
+
+    Note on naming: the SCD2 current-version flag is ``is_current`` (not
+    ``is_active``) to avoid confusion with ``EmployeeProfile.is_active`` which
+    denotes employment status. Employment status is itself snapshotted below.
+    """
+
+    employee = models.ForeignKey(
+        "hr.EmployeeProfile",
+        on_delete=models.CASCADE,
+        related_name="history",
+    )
+
+    # --- Snapshotted (tracked) HR facts ---------------------------------
+    department = models.ForeignKey(
+        "hr.Department",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    # Manager kept as a value snapshot (the manager's own profile id) so the
+    # history survives manager deletion/reorg without dangling references.
+    manager_id_snapshot = models.PositiveBigIntegerField(null=True, blank=True)
+    job_title = models.CharField(max_length=150, blank=True)
+    employment_type = models.CharField(max_length=20, blank=True)
+    user_role = models.CharField(max_length=20, blank=True)
+    salary = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    is_employment_active = models.BooleanField(default=True)
+
+    # --- SCD Type 2 validity window -------------------------------------
+    version = models.PositiveIntegerField(default=1)
+    date_debut = models.DateTimeField(db_index=True)
+    date_fin = models.DateTimeField(null=True, blank=True, db_index=True)
+    is_current = models.BooleanField(default=True)
+
+    # --- Change provenance ----------------------------------------------
+    change_reason = models.CharField(max_length=255, blank=True)
+    changed_by_user_id = models.PositiveBigIntegerField(null=True, blank=True)
+    source_system = models.CharField(max_length=32, blank=True)
+
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["employee_id", "-date_debut"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee"],
+                condition=models.Q(date_fin__isnull=True),
+                name="uniq_open_history_per_employee",
+            ),
+            models.UniqueConstraint(
+                fields=["employee", "version"],
+                name="uniq_history_version_per_employee",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["employee", "is_current"], name="hr_emphist_emp_curr_idx"
+            ),
+            models.Index(
+                fields=["employee", "date_debut", "date_fin"],
+                name="hr_emphist_emp_window_idx",
+            ),
+        ]
+        verbose_name = "Employee history (SCD2)"
+        verbose_name_plural = "Employee history (SCD2)"
+
+    def __str__(self):
+        end = self.date_fin.date() if self.date_fin else "present"
+        start = self.date_debut.date() if self.date_debut else "?"
+        return f"{self.employee_id} v{self.version} [{start} → {end}]"
+
+    @property
+    def tracked_snapshot(self) -> dict:
+        """The set of fields compared to detect a change."""
+        return {
+            "department_id": self.department_id,
+            "manager_id_snapshot": self.manager_id_snapshot,
+            "job_title": self.job_title,
+            "employment_type": self.employment_type,
+            "user_role": self.user_role,
+            "salary": self.salary,
+            "is_employment_active": self.is_employment_active,
+        }
+
+
+class SkillGapForecast(models.Model):
+    """A predicted skill gap for a department/skill over a horizon (Étape 4).
+
+    Persisted so forecasts can themselves be tracked over time (BI / decision
+    support) and compared run to run. Produced by the skill-gap engine.
+    """
+
+    class Severity(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    department = models.ForeignKey(
+        "hr.Department",
+        on_delete=models.CASCADE,
+        related_name="skill_gap_forecasts",
+    )
+    skill = models.ForeignKey(
+        "hr.Skill",
+        on_delete=models.CASCADE,
+        related_name="skill_gap_forecasts",
+    )
+
+    horizon_months = models.PositiveSmallIntegerField(default=6)
+
+    current_avg_level = models.FloatField()
+    velocity_per_month = models.FloatField()
+    projected_level = models.FloatField()
+    demand_level = models.FloatField()
+    gap = models.FloatField()
+    coverage = models.FloatField()
+    attrition_rate = models.FloatField(default=0.0)
+    importance = models.PositiveSmallIntegerField(default=3)
+
+    risk_score = models.FloatField()
+    severity = models.CharField(max_length=6, choices=Severity.choices)
+    rationale = models.TextField(blank=True)
+
+    # Groups all rows produced by a single engine execution.
+    run_id = models.CharField(max_length=36, db_index=True)
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-generated_at", "-risk_score"]
+        indexes = [
+            models.Index(
+                fields=["department", "skill", "-generated_at"],
+                name="hr_gap_dept_skill_gen_idx",
+            ),
+            models.Index(fields=["run_id"], name="hr_gap_run_idx"),
+            models.Index(fields=["severity"], name="hr_gap_severity_idx"),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.department.code}/{self.skill.code} gap={self.gap:.1f} "
+            f"risk={self.risk_score:.0f} ({self.severity})"
+        )

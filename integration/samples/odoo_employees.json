@@ -1,0 +1,67 @@
+{
+  "model": "hr.employee",
+  "export_date": "2026-07-06T09:00:00Z",
+  "records": [
+    {
+      "id": 1001,
+      "x_matricule": "EMP-1001",
+      "name": "Salma Bennani",
+      "work_email": "salma.bennani@smarthr360.io",
+      "job_title": "Head of Engineering",
+      "department_id": [7, "Engineering"],
+      "employee_type": "employee",
+      "first_contract_date": "2019-03-01",
+      "work_phone": "+212522000001",
+      "active": true,
+      "parent_id": "",
+      "smarthr_role": "MANAGER",
+      "smarthr_user_id": 42
+    },
+    {
+      "id": 1002,
+      "x_matricule": "EMP-1002",
+      "name": "Youssef Amrani",
+      "work_email": "youssef.amrani@smarthr360.io",
+      "job_title": "Senior Data Engineer",
+      "department_id": [7, "Engineering"],
+      "employee_type": "employee",
+      "first_contract_date": "2021-09-15",
+      "mobile_phone": "+212661000002",
+      "active": true,
+      "parent_id": "EMP-1001",
+      "smarthr_role": "EMPLOYEE"
+    },
+    {
+      "id": 1003,
+      "x_matricule": "EMP-1003",
+      "name": "Imane",
+      "private_email": "imane.k@smarthr360.io",
+      "job_title": "HR Business Partner",
+      "department_id": [3, "Human Resources"],
+      "employee_type": "part_time",
+      "first_contract_date": "2023-01-10",
+      "active": true,
+      "parent_id": "",
+      "smarthr_role": "HR"
+    },
+    {
+      "id": 1004,
+      "x_matricule": "EMP-1004",
+      "name": "Karim Tazi",
+      "work_email": "karim.tazi@smarthr360.io",
+      "job_title": "Data Science Intern",
+      "department_id": [7, "Engineering"],
+      "employee_type": "trainee",
+      "first_contract_date": "2026-06-01",
+      "active": true,
+      "parent_id": "EMP-1002",
+      "smarthr_role": "EMPLOYEE"
+    },
+    {
+      "x_matricule": "",
+      "name": "Broken Record (no id, no matricule -> rejected)",
+      "work_email": "broken@smarthr360.io",
+      "active": true
+    }
+  ]
+}

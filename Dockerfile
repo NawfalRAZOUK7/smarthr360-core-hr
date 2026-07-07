@@ -17,8 +17,15 @@ COPY . .
 
 RUN SECRET_KEY=build python manage.py collectstatic --noinput --settings=config.settings.local || true
 
+# Run as an unprivileged user (own /app so collectstatic output stays writable).
+RUN useradd --system --create-home --uid 10001 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 8000
 
+# /metrics (django-prometheus) is scraped by Prometheus; /healthz drives the
+# container healthcheck.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
     CMD curl -fs http://localhost:8000/healthz/ || exit 1
 

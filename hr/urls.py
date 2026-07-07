@@ -1,6 +1,12 @@
 from django.urls import path
 
+from .interop.views import (
+    CompetencyDefinitionsView,
+    PersonCompetenciesView,
+    PositionCompetencyModelsView,
+)
 from .org_api import EmployeeExportView, OrgChartView, SkillMatrixView
+from .prediction.views import SkillGapPredictionView
 from .views import (
     DepartmentDetailView,
     DepartmentListCreateView,
@@ -21,6 +27,30 @@ urlpatterns = [
     path("org-chart/", OrgChartView.as_view(), name="hr-org-chart"),
     path("skill-matrix/", SkillMatrixView.as_view(), name="hr-skill-matrix"),
     path("employees/export/", EmployeeExportView.as_view(), name="hr-employee-export"),
+
+    # Interoperability — HR Open Standards (Étape 3)
+    path(
+        "interop/competency-definitions/",
+        CompetencyDefinitionsView.as_view(),
+        name="hr-interop-competency-definitions",
+    ),
+    path(
+        "interop/person-competencies/",
+        PersonCompetenciesView.as_view(),
+        name="hr-interop-person-competencies",
+    ),
+    path(
+        "interop/position-competency-models/",
+        PositionCompetencyModelsView.as_view(),
+        name="hr-interop-position-competency-models",
+    ),
+
+    # Predictions — Skill Gaps (Étape 4)
+    path(
+        "predictions/skill-gaps/",
+        SkillGapPredictionView.as_view(),
+        name="hr-predictions-skill-gaps",
+    ),
 
     # Departments
     path("departments/", DepartmentListCreateView.as_view(), name="hr-department-list"),

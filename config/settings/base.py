@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'hr',
     'reviews',
     'wellbeing',
+    'integration',
 ]
 
 MIDDLEWARE = [

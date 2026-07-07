@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Simplified SAP HR export (IDoc HRMD-like). PERNR = personnel number. -->
+<HRMD_EMPLOYEES exportDate="2026-07-06">
+  <EMPLOYEE>
+    <PERNR>00100001</PERNR>
+    <VORNA>Nadia</VORNA>
+    <NACHN>El Ouazzani</NACHN>
+    <SMTP_ADDR>nadia.elouazzani@smarthr360.io</SMTP_ADDR>
+    <ORGEH_CODE>FIN</ORGEH_CODE>
+    <ORGEH_TEXT>Finance</ORGEH_TEXT>
+    <STELL_TEXT>Chief Financial Officer</STELL_TEXT>
+    <PERSK>DU</PERSK>
+    <BEGDA>20180401</BEGDA>
+    <TELNR>+212537000010</TELNR>
+    <STAT2>3</STAT2>
+    <CHEF_PERNR></CHEF_PERNR>
+    <SMARTHR_ROLE>ADMIN</SMARTHR_ROLE>
+  </EMPLOYEE>
+  <EMPLOYEE>
+    <PERNR>00100204</PERNR>
+    <VORNA>Amine</VORNA>
+    <NACHN>El Fassi</NACHN>
+    <SMTP_ADDR>amine.elfassi@smarthr360.io</SMTP_ADDR>
+    <ORGEH_CODE>FIN</ORGEH_CODE>
+    <ORGEH_TEXT>Finance</ORGEH_TEXT>
+    <STELL_TEXT>Financial Controller</STELL_TEXT>
+    <PERSK>DU</PERSK>
+    <BEGDA>2022-02-14</BEGDA>
+    <TELNR>+212661000204</TELNR>
+    <STAT2>3</STAT2>
+    <CHEF_PERNR>00100001</CHEF_PERNR>
+    <SMARTHR_ROLE>EMPLOYEE</SMARTHR_ROLE>
+  </EMPLOYEE>
+  <EMPLOYEE>
+    <PERNR>00100311</PERNR>
+    <VORNA>Sara</VORNA>
+    <NACHN>Idrissi</NACHN>
+    <SMTP_ADDR>sara.idrissi@smarthr360.io</SMTP_ADDR>
+    <ORGEH_CODE>FIN</ORGEH_CODE>
+    <ORGEH_TEXT>Finance</ORGEH_TEXT>
+    <STELL_TEXT>Accounting Intern</STELL_TEXT>
+    <PERSK>TR</PERSK>
+    <BEGDA>20260601</BEGDA>
+    <STAT2>3</STAT2>
+    <CHEF_PERNR>00100204</CHEF_PERNR>
+  </EMPLOYEE>
+  <EMPLOYEE>
+    <PERNR>00100999</PERNR>
+    <VORNA>Former</VORNA>
+    <NACHN>Employee</NACHN>
+    <SMTP_ADDR>former.employee@smarthr360.io</SMTP_ADDR>
+    <ORGEH_CODE>FIN</ORGEH_CODE>
+    <ORGEH_TEXT>Finance</ORGEH_TEXT>
+    <STELL_TEXT>Analyst (left)</STELL_TEXT>
+    <PERSK>DU</PERSK>
+    <BEGDA>20150101</BEGDA>
+    <STAT2>0</STAT2>
+    <CHEF_PERNR>00100001</CHEF_PERNR>
+  </EMPLOYEE>
+</HRMD_EMPLOYEES>
