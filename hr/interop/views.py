@@ -25,7 +25,6 @@ from .mappers import (
     competency_definition,
     person_competency,
     position_competency_model,
-    proficiency_scale_descriptor,
 )
 from .pagination import HROpenPagination
 from .serializers import (

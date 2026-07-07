@@ -19,7 +19,7 @@ implementation gives identical results.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Sequence
+from typing import Sequence
 
 PROFICIENCY_MAX = 4
 
