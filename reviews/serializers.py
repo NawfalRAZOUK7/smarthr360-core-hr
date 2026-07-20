@@ -116,9 +116,14 @@ class GoalSerializer(serializers.ModelSerializer):
 
     employee_id = serializers.IntegerField(write_only=True, required=False)
     cycle_id = serializers.IntegerField(write_only=True, required=False)
+    source_review_id = serializers.PrimaryKeyRelatedField(
+        source="source_review", queryset=PerformanceReview.objects.all(),
+        write_only=True, required=False, allow_null=True,
+    )
 
     employee = serializers.SerializerMethodField(read_only=True)
     cycle = ReviewCycleSerializer(read_only=True)
+    training_actions_count = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Goal
@@ -126,12 +131,14 @@ class GoalSerializer(serializers.ModelSerializer):
             "id",
             "employee_id",
             "cycle_id",
+            "source_review_id",
             "employee",
             "cycle",
             "title",
             "description",
             "status",
             "progress_percent",
+            "training_actions_count",
             "created_at",
             "updated_at",
         ]
@@ -153,3 +160,6 @@ class GoalSerializer(serializers.ModelSerializer):
                 "last_name": emp.last_name,
             },
         }
+
+    def get_training_actions_count(self, obj):
+        return obj.training_actions.count()

@@ -136,6 +136,13 @@ class Goal(models.Model):
         on_delete=models.CASCADE,
         related_name="goals",
     )
+    source_review = models.ForeignKey(
+        "reviews.PerformanceReview",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="spawned_goals",
+    )
     cycle = models.ForeignKey(
         ReviewCycle,
         on_delete=models.SET_NULL,

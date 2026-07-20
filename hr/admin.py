@@ -5,6 +5,7 @@ from .models import (
     EmployeeProfile,
     EmployeeProfileHistory,
     SkillGapForecast,
+    Notification,
 )
 
 
@@ -57,3 +58,10 @@ class SkillGapForecastAdmin(admin.ModelAdmin):
     search_fields = ("skill__code", "skill__name", "department__code", "run_id")
     date_hierarchy = "generated_at"
     readonly_fields = tuple(f.name for f in SkillGapForecast._meta.fields)
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ("user_id", "type", "title", "read", "created_at", "digest_sent_at")
+    list_filter = ("type", "read")
+    search_fields = ("title", "body")

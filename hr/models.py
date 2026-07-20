@@ -1,5 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
+from datetime import timedelta
 
 # Microservice note (ADR-005): this service has NO ForeignKey to the auth
 # service's User table. Identity lives in JWT claims; we persist the auth
@@ -409,3 +411,114 @@ class SkillGapForecast(models.Model):
             f"{self.department.code}/{self.skill.code} gap={self.gap:.1f} "
             f"risk={self.risk_score:.0f} ({self.severity})"
         )
+
+
+class EmployeeDocument(models.Model):
+    class DocumentType(models.TextChoices):
+        CONTRACT = "CONTRACT", "Contract"
+        ID = "ID", "Identification"
+        CERTIFICATION = "CERTIFICATION", "Certification"
+        POLICY_ACK = "POLICY_ACK", "Policy acknowledgement"
+        OTHER = "OTHER", "Other"
+
+    employee = models.ForeignKey(
+        EmployeeProfile, on_delete=models.CASCADE, related_name="documents"
+    )
+    doc_type = models.CharField(max_length=20, choices=DocumentType.choices)
+    title = models.CharField(max_length=200)
+    reference_url = models.CharField(max_length=500)
+    issue_date = models.DateField()
+    expiry_date = models.DateField(null=True, blank=True, db_index=True)
+    uploaded_by_user_id = models.PositiveBigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    @property
+    def is_expiring_soon(self):
+        if self.expiry_date is None:
+            return False
+        today = timezone.localdate()
+        return today <= self.expiry_date <= today + timedelta(days=30)
+
+
+class TrainingAction(models.Model):
+    """A concrete, trackable plan to close a skill gap — the action that turns a
+    skill-gap forecast into "these people, this course, by this date".
+
+    Closes the future-skills loop: a gap (SkillGapForecast) becomes an owned,
+    dated, budgeted action whose progress and outcome are tracked over time.
+    """
+
+    class Status(models.TextChoices):
+        PLANNED = "PLANNED", "Planned"
+        IN_PROGRESS = "IN_PROGRESS", "In progress"
+        COMPLETED = "COMPLETED", "Completed"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    skill = models.ForeignKey(
+        Skill, on_delete=models.CASCADE, related_name="training_actions"
+    )
+    department = models.ForeignKey(
+        Department, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="training_actions",
+    )
+    employee = models.ForeignKey(
+        EmployeeProfile, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="training_actions",
+    )
+    goal = models.ForeignKey(
+        "reviews.Goal", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="training_actions",
+    )
+    title = models.CharField(max_length=200, help_text="e.g. 'Kubernetes CKA certification'")
+    provider = models.CharField(max_length=200, blank=True)
+    owner_user_id = models.PositiveBigIntegerField(
+        null=True, blank=True, help_text="Auth user id accountable for delivery."
+    )
+    target_level = models.PositiveSmallIntegerField(null=True, blank=True, help_text="1-4")
+    due_date = models.DateField(null=True, blank=True)
+    budget = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PLANNED, db_index=True
+    )
+    progress_percent = models.PositiveSmallIntegerField(default=0, help_text="0-100")
+    notes = models.TextField(blank=True)
+    created_by_user_id = models.PositiveBigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.title} [{self.status}] {self.progress_percent}%"
+
+
+class Notification(models.Model):
+    """A user-scoped notification keyed by the auth-service user id."""
+
+    class Type(models.TextChoices):
+        TRAINING_ASSIGNED = "TRAINING_ASSIGNED", "Training assigned"
+        REVIEW_DUE = "REVIEW_DUE", "Review due"
+        RISK_FLAGGED = "RISK_FLAGGED", "Risk flagged"
+        OUTCOME_DUE = "OUTCOME_DUE", "Outcome due"
+        WELLBEING_FLAGGED = "WELLBEING_FLAGGED", "Wellbeing flagged"
+        GENERIC = "GENERIC", "Generic"
+
+    user_id = models.PositiveBigIntegerField(db_index=True)
+    type = models.CharField(max_length=32, choices=Type.choices, default=Type.GENERIC)
+    title = models.CharField(max_length=200)
+    body = models.TextField(blank=True)
+    link = models.CharField(max_length=500, blank=True)
+    read = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    digest_sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["read", "-created_at"]
+        indexes = [models.Index(fields=["user_id", "read", "-created_at"], name="hr_notif_user_read_idx")]
+
+    def __str__(self):
+        return f"{self.user_id}: {self.title}"

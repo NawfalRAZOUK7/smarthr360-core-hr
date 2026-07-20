@@ -10,12 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-COPY smarthr360_jwt_auth-1.1.1-py3-none-any.whl .
+COPY smarthr360_jwt_auth-1.2.0-py3-none-any.whl .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN SECRET_KEY=build python manage.py collectstatic --noinput --settings=config.settings.local || true
+RUN SECRET_KEY=build-only-not-for-runtime \
+    python manage.py collectstatic --noinput --settings=config.settings.local
 
 # Run as an unprivileged user (own /app so collectstatic output stays writable).
 RUN useradd --system --create-home --uid 10001 appuser \

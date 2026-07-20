@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
-from .models import Department, EmployeeProfile, EmployeeSkill, FutureCompetency, Skill
+from reviews.models import Goal
+
+from .models import Department, EmployeeDocument, EmployeeProfile, EmployeeSkill, FutureCompetency, Notification, Skill, TrainingAction
 
 
 class IdentitySerializer(serializers.Serializer):
@@ -225,3 +227,79 @@ class FutureCompetencySerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class EmployeeDocumentSerializer(serializers.ModelSerializer):
+    is_expiring_soon = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = EmployeeDocument
+        fields = [
+            "id", "employee", "doc_type", "title", "reference_url",
+            "issue_date", "expiry_date", "uploaded_by_user_id",
+            "is_expiring_soon", "created_at",
+        ]
+        read_only_fields = ["employee", "uploaded_by_user_id", "created_at"]
+
+
+class TrainingActionSerializer(serializers.ModelSerializer):
+    """A trackable plan to close a skill gap (course + owner + due date + status)."""
+
+    skill_id = serializers.PrimaryKeyRelatedField(
+        source="skill", queryset=Skill.objects.all(), write_only=True
+    )
+    department_id = serializers.PrimaryKeyRelatedField(
+        source="department", queryset=Department.objects.all(),
+        write_only=True, required=False, allow_null=True,
+    )
+    employee_id = serializers.PrimaryKeyRelatedField(
+        source="employee", queryset=EmployeeProfile.objects.all(),
+        write_only=True, required=False, allow_null=True,
+    )
+    goal_id = serializers.PrimaryKeyRelatedField(
+        source="goal", queryset=Goal.objects.all(),
+        write_only=True, required=False, allow_null=True,
+    )
+    skill = serializers.SerializerMethodField(read_only=True)
+    department = serializers.SerializerMethodField(read_only=True)
+    employee = serializers.SerializerMethodField(read_only=True)
+    goal = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = TrainingAction
+        fields = [
+            "id", "title", "provider",
+            "skill", "skill_id", "department", "department_id", "employee", "employee_id",
+            "goal", "goal_id",
+            "owner_user_id", "target_level", "due_date", "budget",
+            "status", "progress_percent", "notes", "created_at", "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def get_skill(self, obj):
+        if not obj.skill_id:
+            return None
+        return {"id": obj.skill_id, "name": obj.skill.name, "code": obj.skill.code}
+
+    def get_department(self, obj):
+        if not obj.department_id:
+            return None
+        return {"id": obj.department_id, "name": obj.department.name}
+
+    def get_employee(self, obj):
+        if not obj.employee_id:
+            return None
+        e = obj.employee
+        return {"id": obj.employee_id, "name": f"{e.first_name} {e.last_name}".strip() or e.email}
+
+    def get_goal(self, obj):
+        if not obj.goal_id:
+            return None
+        return {"id": obj.goal_id, "title": obj.goal.title, "status": obj.goal.status}
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ["id", "user_id", "type", "title", "body", "link", "read", "created_at"]
+        read_only_fields = ["id", "read", "created_at"]

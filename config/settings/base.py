@@ -53,6 +53,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Platform guarantee: AUDITOR tokens (public demo guest) are read-only.
+    'smarthr360_jwt_auth.readonly.AuditorReadOnlyMiddleware',
     'config.middleware.AdminIPWhitelistMiddleware',
     'django_prometheus.middleware.PrometheusAfterMiddleware',
 ]
@@ -102,6 +104,11 @@ STORAGES = {
 }
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend'
+)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='notifications@smarthr360.local')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

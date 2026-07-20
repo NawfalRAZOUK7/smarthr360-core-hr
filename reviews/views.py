@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from smarthr360_jwt_auth.access import has_hr_access, has_manager_access, is_auditor, is_manager
-from hr.models import EmployeeProfile
+from hr.models import EmployeeProfile, Notification
 from config.api_mixins import ApiResponseMixin
 from hr.identity import get_own_profile
 
@@ -142,6 +142,16 @@ class PerformanceReviewListCreateView(ApiResponseMixin, generics.ListCreateAPIVi
         )
         if template is not None:
             apply_template(review, template)
+        if employee.user_id:
+            from hr.services.notifications import create_notification_best_effort
+
+            create_notification_best_effort(
+                user_id=employee.user_id,
+                notification_type=Notification.Type.REVIEW_DUE,
+                title="Performance review due",
+                body=f'Your review for "{cycle.name}" is ready.',
+                link="/reviews",
+            )
         # overall_score will be computed later when items are added
         return review
 

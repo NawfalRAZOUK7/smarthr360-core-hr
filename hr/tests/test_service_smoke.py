@@ -50,6 +50,66 @@ class ServiceSmokeTests(TestCase):
         self.assertEqual(profile.email, "al@corp.com")
         self.assertEqual(profile.user_role, "EMPLOYEE")
 
+    def test_support_and_auditor_can_read_but_not_write_employees(self):
+        EmployeeProfile.objects.create(user_id=200, user_role="EMPLOYEE")
+        url = "/api/hr/employees/"
+
+        # Auditor & Support (JWT groups) get read-only directory access.
+        self.assertEqual(
+            self.client.get(url, **auth_header(1, "EMPLOYEE", groups=["AUDITOR"])).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.get(url, **auth_header(2, "EMPLOYEE", groups=["SUPPORT"])).status_code,
+            200,
+        )
+        # A plain employee cannot list the whole directory.
+        self.assertEqual(
+            self.client.get(url, **auth_header(3, "EMPLOYEE")).status_code, 403
+        )
+        # Support is read-only — no create.
+        denied = self.client.post(
+            url, {"user_id": 999}, content_type="application/json",
+            **auth_header(2, "EMPLOYEE", groups=["SUPPORT"]),
+        )
+        self.assertEqual(denied.status_code, 403)
+
+    def test_search_finds_people_and_skills(self):
+        dept = Department.objects.create(name="Engineering", code="ENG")
+        EmployeeProfile.objects.create(
+            user_id=300, first_name="Sara", last_name="Idrissi",
+            user_role="EMPLOYEE", department=dept,
+        )
+        Skill.objects.create(name="Kubernetes")
+
+        people = self.client.get("/api/hr/search/?q=idris", **auth_header(1, "HR"))
+        self.assertEqual(people.status_code, 200, people.content)
+        data = people.json().get("data", people.json())
+        labels = " ".join(r["label"] for r in data["results"])
+        self.assertIn("Sara Idrissi", labels)
+
+        skills = self.client.get("/api/hr/search/?q=kuber", **auth_header(1, "HR")).json()
+        sd = skills.get("data", skills)
+        self.assertTrue(
+            any(r["type"] == "skill" and "Kubernetes" in r["label"] for r in sd["results"])
+        )
+
+    def test_search_scopes_employees_to_role(self):
+        dept = Department.objects.create(name="Engineering", code="ENG")
+        EmployeeProfile.objects.create(user_id=300, first_name="Sara", last_name="Idrissi", user_role="EMPLOYEE", department=dept)
+        EmployeeProfile.objects.create(user_id=301, first_name="Omar", last_name="Idrissi", user_role="EMPLOYEE", department=dept)
+        # Employee 301 searching a shared surname sees only themselves.
+        resp = self.client.get("/api/hr/search/?q=idris", **auth_header(301, "EMPLOYEE")).json()
+        data = resp.get("data", resp)
+        emp = [r for r in data["results"] if r["type"] == "employee"]
+        self.assertEqual(len(emp), 1)
+        self.assertIn("Omar", emp[0]["label"])
+
+    def test_search_short_query_is_empty(self):
+        resp = self.client.get("/api/hr/search/?q=a", **auth_header(1, "HR")).json()
+        data = resp.get("data", resp)
+        self.assertEqual(data["results"], [])
+
     def test_hr_creates_profile_for_user_id(self):
         dept = Department.objects.create(name="IT", code="IT")
         resp = self.client.post(

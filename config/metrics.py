@@ -34,6 +34,7 @@ ERP_SYNC_LAST_SUCCESS = Gauge(
     "smarthr360_erp_sync_last_success_timestamp_seconds",
     "Unix time of the last successful (SUCCESS/PARTIAL) ERP sync, by source.",
     ["source_system"],
+    multiprocess_mode="max",  # timestamp: latest across workers
 )
 
 # ---------------------------------------------------------------------------
@@ -43,17 +44,20 @@ SKILL_GAP_FORECASTS = Gauge(
     "smarthr360_skill_gap_forecasts",
     "Latest skill-gap forecast count, by department and severity.",
     ["department", "severity"],
+    multiprocess_mode="livesum",  # current count: sum across live workers
 )
 
 SKILL_GAP_HIGH = Gauge(
     "smarthr360_skill_gap_high_count",
     "Latest number of HIGH-severity skill gaps, by department.",
     ["department"],
+    multiprocess_mode="livesum",
 )
 
 SKILL_GAP_LAST_RUN = Gauge(
     "smarthr360_skill_gap_last_run_timestamp_seconds",
     "Unix time of the last skill-gap prediction run.",
+    multiprocess_mode="max",  # timestamp: latest across workers
 )
 
 

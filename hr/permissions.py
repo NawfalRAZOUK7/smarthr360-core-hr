@@ -2,9 +2,31 @@
 
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
-from smarthr360_jwt_auth.access import has_hr_access, is_auditor, is_manager
+from smarthr360_jwt_auth.access import (
+    has_hr_access,
+    is_auditor,
+    is_manager,
+    is_support,
+)
 
 from .identity import get_own_profile
+
+
+class IsPeopleReadAccess(BasePermission):
+    """People-directory access.
+
+    Read (SAFE methods): HR/Admin, Auditor and Support (read-only lookup).
+    Write: HR/Admin only. Managers/employees fall through to their own
+    scoped endpoints and are not granted the full directory here.
+    """
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if request.method in SAFE_METHODS:
+            return has_hr_access(user) or is_auditor(user) or is_support(user)
+        return has_hr_access(user)
 
 
 class EmployeeProfileAccessPermission(BasePermission):
