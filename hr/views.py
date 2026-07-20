@@ -15,7 +15,6 @@ from smarthr360_jwt_auth.access import (
     is_manager,
 )
 from smarthr360_jwt_auth.permissions import (
-    IsHROrAuditorReadOnly,
     IsHRRole,
     IsManagerOrAuditorReadOnly,
     IsManagerOrAbove,
